@@ -56,6 +56,7 @@ func (s *server) getNumDocumentsProcessed() int {
 }
 
 func (s *server) Register(req *rpc.RegisterRequest, resp *rpc.RegisterResponse) error {
+	log.Printf("Registered new worker: %s %s\n", req.Name, req.Address)
 	s.workers[req.Name] = req.Address
 	return nil
 }
@@ -97,6 +98,10 @@ func NewController(numBits uint) (*Controller, error) {
 	return &Controller{
 		s: server,
 	}, nil
+}
+
+func (c *Controller) NumUniques() uint64 {
+	return c.s.hll.Count()
 }
 
 func (c *Controller) Serve(port int, startFrom string, numDocuments int) error {

@@ -1,0 +1,75 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: unique-operator
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unique-operator
+  namespace: unique-operator
+spec:
+  selector:
+    matchLabels:
+      app: unique-operator
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: unique-operator
+    spec:
+      containers:
+      - name: operator
+        image: giolekva/unique-operator:v0.1
+        imagePullPolicy: IfNotPresent
+        command:
+        - "unique_operator"
+      tolerations:
+      - key: "pcloud"
+        operator: "Equal"
+        value: "role"
+        effect: "NoSchedule"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: operator
+  namespace: unique-operator
+rules:
+- apiGroups:
+  - "lekva.me"
+  resources:
+  - countuniques
+  - countuniques/status
+  verbs:
+  - list
+  - get
+  - update
+  - watch
+- apiGroups:
+  - "batch"
+  resources:
+  - jobs
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: operator
+  namespace: unique-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: operator
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: unique-operator

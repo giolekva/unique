@@ -16,9 +16,11 @@ type CountUnique struct {
 }
 
 type CountUniqueSpec struct {
-	StartFrom    string `json:"startFrom"`
-	NumDocuments int    `json:"numDocuments"`
-	NumBits      int    `json:"numBits"`
+	StartFrom         string `json:"startFrom"`
+	NumDocuments      int    `json:"numDocuments"`
+	NumBits           int    `json:"numBits"`
+	NumWorkers        int32  `json:"numWorkers"`
+	WorkerParallelism int    `json:"workerParallelism"`
 }
 
 type CountUniqueStatus struct {

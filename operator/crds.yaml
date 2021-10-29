@@ -32,6 +32,10 @@ spec:
                   type: integer
                 numBits:
                   type: integer
+                numWorkers:
+                  type: integer
+                workerParallelism:
+                  type: integer
             status:
               type: object
               properties:

@@ -28,4 +28,5 @@ func main() {
 	if err := c.Serve(port, startFrom, numDocuments); err != nil {
 		log.Fatal(err)
 	}
+	log.Printf("!!! Number of unique words: %d\n", c.NumUniques())
 }

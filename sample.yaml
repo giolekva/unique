@@ -1,9 +1,11 @@
 apiVersion: lekva.me/v1
 kind: CountUnique
 metadata:
-  name: sample
+  name: sample1
   namespace: unique
 spec:
   startFrom: "https://gio.lekva.me"
-  numDocuments: 100
-  numBits: 1024
+  numDocuments: 1000
+  numBits: 2048
+  numWorkers: 10
+  workerParallelism: 10

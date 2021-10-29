@@ -8,6 +8,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -128,7 +129,15 @@ func (c *UniqueCountsController) processCountUniques(key string) error {
 	}
 	_, err = c.kubeClient.BatchV1().Jobs(cu.Namespace).Create(context.TODO(), c.generateControllerConfig(cu), metav1.CreateOptions{})
 	if err != nil {
-		panic(err)
+		return err
+	}
+	_, err = c.kubeClient.CoreV1().Services(cu.Namespace).Create(context.TODO(), c.generateServiceConfig(cu), metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	_, err = c.kubeClient.BatchV1().Jobs(cu.Namespace).Create(context.TODO(), c.generateWorkersConfig(cu), metav1.CreateOptions{})
+	if err != nil {
+		return err
 	}
 	c.updateCountUniqueStatus(cu, uniquev1.CountUniqueStateRunning, "olalaaaa")
 	return nil
@@ -144,7 +153,7 @@ func (c *UniqueCountsController) updateCountUniqueStatus(cu *uniquev1.CountUniqu
 
 func (c *UniqueCountsController) generateControllerConfig(cu *uniquev1.CountUnique) *batchv1.Job {
 	ctrlName := fmt.Sprintf("%s-controller", cu.Name)
-	j := &batchv1.Job{
+	return &batchv1.Job{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "batch/v1",
 			Kind:       "Job",
@@ -166,7 +175,7 @@ func (c *UniqueCountsController) generateControllerConfig(cu *uniquev1.CountUniq
 					Containers: []corev1.Container{
 						corev1.Container{
 							Name:            "controller",
-							Image:           "giolekva/unique:v5",
+							Image:           "giolekva/unique:v0.1",
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Ports: []corev1.ContainerPort{
 								corev1.ContainerPort{
@@ -188,5 +197,102 @@ func (c *UniqueCountsController) generateControllerConfig(cu *uniquev1.CountUniq
 			},
 		},
 	}
-	return j
+}
+
+func (c *UniqueCountsController) generateWorkersConfig(cu *uniquev1.CountUnique) *batchv1.Job {
+	ctrlName := fmt.Sprintf("%s-controller", cu.Name)
+	workersName := fmt.Sprintf("%s-workers", cu.Name)
+	return &batchv1.Job{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "batch/v1",
+			Kind:       "Job",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      workersName,
+			Namespace: cu.Namespace,
+		},
+		Spec: batchv1.JobSpec{
+			Parallelism: &cu.Spec.NumWorkers,
+			Completions: &cu.Spec.NumWorkers,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": workersName,
+					},
+				},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name:            "worker",
+							Image:           "giolekva/unique:v0.1",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Env: []corev1.EnvVar{
+								corev1.EnvVar{
+									Name: "POD_NAME",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "metadata.name",
+										},
+									},
+								},
+								corev1.EnvVar{
+									Name: "POD_IP",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "status.podIP",
+										},
+									},
+								},
+							},
+							Ports: []corev1.ContainerPort{
+								corev1.ContainerPort{
+									Name:          "worker",
+									ContainerPort: 1234,
+									Protocol:      corev1.ProtocolTCP,
+								},
+							},
+							Command: []string{
+								"server_worker",
+								fmt.Sprintf("--controller-address=%s.%s.svc.cluster.local:8080", ctrlName, cu.Namespace),
+								fmt.Sprintf("--num-workers=%d", cu.Spec.WorkerParallelism),
+								fmt.Sprintf("--num-bits=%d", cu.Spec.NumBits),
+								"--port=1234",
+								"--name=$(POD_NAME)",
+								"--address=$(POD_IP)",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func (c *UniqueCountsController) generateServiceConfig(cu *uniquev1.CountUnique) *corev1.Service {
+	ctrlName := fmt.Sprintf("%s-controller", cu.Name)
+	return &corev1.Service{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "core/v1",
+			Kind:       "Service",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ctrlName,
+			Namespace: cu.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeClusterIP,
+			Selector: map[string]string{
+				"app": ctrlName,
+			},
+			Ports: []corev1.ServicePort{
+				corev1.ServicePort{
+					Name:       "controller",
+					Port:       8080,
+					TargetPort: intstr.FromString("controller"),
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+		},
+	}
 }

@@ -35,7 +35,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: worker
-        image: giolekva/unique:v5
+        image: giolekva/unique:v0.1
         imagePullPolicy: IfNotPresent
         env:
         - name: POD_NAME
@@ -84,7 +84,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: controller
-        image: giolekva/unique:v5
+        image: giolekva/unique:v0.1
         imagePullPolicy: IfNotPresent
         ports:
         - name: controller
