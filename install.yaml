@@ -1,0 +1,103 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: unique
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: controller
+  namespace: unique
+spec:
+  type: ClusterIP
+  selector:
+    app: controller
+  ports:
+  - name: controller
+    port: 8080
+    targetPort: controller
+    protocol: TCP
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: workers
+  namespace: unique
+spec:
+  parallelism: 30
+  completions: 30
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: worker
+        image: giolekva/unique:v5
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        ports:
+        - name: worker
+          containerPort: 1234
+          protocol: TCP
+        command:
+        - "server_worker"
+        - "--controller-address=controller.unique.svc.cluster.local:8080"
+        - "--num-workers=10"
+        - "--num-bits=1024"
+        - "--port=1234"
+        - "--name=$(POD_NAME)"
+        - "--address=$(POD_IP)"
+        resources:
+          requests:
+            cpu: "200m"
+          # limits:
+          #   cpu: "3000m"
+      # tolerations:
+      # - key: "pcloud"
+      #   operator: "Equal"
+      #   value: "role"
+      #   effect: "NoSchedule"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: controller
+  namespace: unique
+spec:
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app: controller
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: controller
+        image: giolekva/unique:v5
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: controller
+          containerPort: 4321
+          protocol: TCP
+        command:
+        - "server_controller"
+        - "--num-bits=1024"
+        - "--port=4321"
+        - "--start-from=https://gio.lekva.me"
+        - "--num-documents=10000"
+      tolerations:
+      - key: "pcloud"
+        operator: "Equal"
+        value: "role"
+        effect: "NoSchedule"
