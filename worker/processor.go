@@ -10,8 +10,8 @@ import (
 	"unicode"
 
 	"github.com/DataDog/hyperloglog"
+	"github.com/giolekva/unique/rpc"
 	"golang.org/x/net/html"
-	"lekva.me/unique/rpc"
 )
 
 type StatsConsumer func(rpc.WorkerStatistics, *hyperloglog.HyperLogLog, []string)

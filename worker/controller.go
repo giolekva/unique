@@ -4,7 +4,7 @@ import (
 	nrpc "net/rpc"
 
 	"github.com/DataDog/hyperloglog"
-	"lekva.me/unique/rpc"
+	"github.com/giolekva/unique/rpc"
 )
 
 type Controller interface {

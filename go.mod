@@ -1,4 +1,4 @@
-module lekva.me/unique
+module github.com/giolekva/unique
 
 go 1.16
 

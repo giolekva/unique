@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/DataDog/hyperloglog"
-	"lekva.me/unique/rpc"
+	"github.com/giolekva/unique/rpc"
 )
 
 type shutdownListener struct {

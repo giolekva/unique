@@ -7,7 +7,7 @@ import (
 	"net/rpc"
 	"time"
 
-	"lekva.me/unique/worker"
+	"github.com/giolekva/unique/worker"
 )
 
 var name string

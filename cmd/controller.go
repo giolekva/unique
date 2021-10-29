@@ -4,7 +4,7 @@ import (
 	"flag"
 	"log"
 
-	"lekva.me/unique/controller"
+	"github.com/giolekva/unique/controller"
 )
 
 var port int
