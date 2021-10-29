@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -18,6 +20,8 @@ import (
 	informers "github.com/giolekva/unique/operator/generated/informers/externalversions/unique/v1"
 	listers "github.com/giolekva/unique/operator/generated/listers/unique/v1"
 )
+
+var ctrlParallelism int32 = 1
 
 type UniqueCountsController struct {
 	kubeClient   kubernetes.Interface
@@ -122,6 +126,10 @@ func (c *UniqueCountsController) processCountUniques(key string) error {
 		fmt.Printf("%s CountUnique is already in Running state\n", cu.Name)
 		return nil
 	}
+	_, err = c.kubeClient.BatchV1().Jobs(cu.Namespace).Create(context.TODO(), c.generateControllerConfig(cu), metav1.CreateOptions{})
+	if err != nil {
+		panic(err)
+	}
 	c.updateCountUniqueStatus(cu, uniquev1.CountUniqueStateRunning, "olalaaaa")
 	return nil
 }
@@ -132,4 +140,53 @@ func (c *UniqueCountsController) updateCountUniqueStatus(cu *uniquev1.CountUniqu
 	cp.Status.Message = msg
 	_, err := c.uniqueClient.LekvaV1().CountUniques(cp.Namespace).UpdateStatus(context.TODO(), cp, metav1.UpdateOptions{})
 	return err
+}
+
+func (c *UniqueCountsController) generateControllerConfig(cu *uniquev1.CountUnique) *batchv1.Job {
+	ctrlName := fmt.Sprintf("%s-controller", cu.Name)
+	j := &batchv1.Job{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "batch/v1",
+			Kind:       "Job",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      ctrlName,
+			Namespace: cu.Namespace,
+		},
+		Spec: batchv1.JobSpec{
+			Parallelism: &ctrlParallelism,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app": ctrlName,
+					},
+				},
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name:            "controller",
+							Image:           "giolekva/unique:v5",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							Ports: []corev1.ContainerPort{
+								corev1.ContainerPort{
+									Name:          "controller",
+									ContainerPort: 4321,
+									Protocol:      corev1.ProtocolTCP,
+								},
+							},
+							Command: []string{
+								"server_controller",
+								fmt.Sprintf("--num-bits=%d", cu.Spec.NumBits),
+								"--port=4321",
+								fmt.Sprintf("--start-from=%s", cu.Spec.StartFrom),
+								fmt.Sprintf("--num-documents=%d", cu.Spec.NumDocuments),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	return j
 }
